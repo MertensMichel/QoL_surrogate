@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qol_surrogate"
+version = "0.1.0"
+description = "A surrogate model for the Quality of Life (QoL) calculations needed for the MAAT RL Framework."
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
