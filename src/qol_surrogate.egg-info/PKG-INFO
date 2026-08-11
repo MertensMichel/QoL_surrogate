@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: qol_surrogate
+Version: 0.1.0
+Summary: A surrogate model for the Quality of Life (QoL) calculations needed for the MAAT RL Framework.
+Requires-Python: >=3.11

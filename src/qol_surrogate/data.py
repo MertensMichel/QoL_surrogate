@@ -206,11 +206,21 @@ def split_dataset(x, y, test_size=0.2, val_size=0.125, random_state=13):
     notes from the build_graph session on why that would leak scenarios).
     val_size is relative to the *remaining* data after the test split
     (0.125 of the remaining 80% = 10% of the original total).
-    """
-    x_tmp, x_test, y_tmp, y_test = train_test_split(x, y, test_size=test_size, random_state=random_state)
-    x_train, x_val, y_train, y_val = train_test_split(x_tmp, y_tmp, test_size=val_size, random_state=random_state)
 
-    return x_train, x_val, x_test, y_train, y_val, y_test
+    Also returns which *original* scenario index (0..n_samples-1, matching row
+    order in the source hex-level parquet) ended up in each split - needed to
+    go back to hex-resolution ground truth for exactly the test-set scenarios.
+    """
+    idx = np.arange(x.shape[0])
+
+    x_tmp, x_test, y_tmp, y_test, idx_tmp, idx_test = train_test_split(
+        x, y, idx, test_size=test_size, random_state=random_state
+    )
+    x_train, x_val, y_train, y_val, idx_train, idx_val = train_test_split(
+        x_tmp, y_tmp, idx_tmp, test_size=val_size, random_state=random_state
+    )
+
+    return x_train, x_val, x_test, y_train, y_val, y_test, idx_train, idx_val, idx_test
 
 
 def compute_normalization_stats(x_train, y_train):

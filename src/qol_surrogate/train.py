@@ -3,19 +3,33 @@
 
 
 
+import copy
+
 import torch
 
 
-def train(model, train_loader, val_loader, num_epochs=100, lr=0.001):
+def train(model, train_loader, val_loader, num_epochs=100, lr=0.001, patience=None, min_delta=0.0):
     """Train the model using the provided training and validation data loaders.
 
+    If patience is set, stops early once validation loss hasn't improved
+    (by more than min_delta) for `patience` consecutive epochs, and restores
+    the best-seen weights before returning - the loop stopping early doesn't
+    mean the *last* epoch's weights are the best ones, so they aren't just
+    left in place.
+
     Returns the trained model plus the full per-epoch loss history (one value
-    per epoch each), so callers can plot loss vs. epoch afterward.
+    per epoch each - shorter than num_epochs if stopped early), so callers can
+    plot loss vs. epoch afterward.
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
     criterion = torch.nn.MSELoss()
 
     train_losses, val_losses = [], []
+
+    best_val_loss = float('inf')
+    best_state_dict = None
+    epochs_without_improvement = 0
 
     for epoch in range(num_epochs):
 
@@ -43,6 +57,24 @@ def train(model, train_loader, val_loader, num_epochs=100, lr=0.001):
 
         if epoch % 10 == 0:  # Print every 10 epochs
             print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
+
+        scheduler.step(val_loss)  # Adjust learning rate based on validation loss
+        # Early stopping logic
+        if patience is not None:
+            if val_loss < best_val_loss - min_delta:
+                best_val_loss = val_loss
+                best_state_dict = copy.deepcopy(model.state_dict())
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
+            if epochs_without_improvement >= patience:
+                print(f'Early stopping at epoch {epoch} (no improvement in {patience} epochs, '
+                      f'best validation loss: {best_val_loss:.4f})')
+                break
+
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
 
     return model, train_losses, val_losses
 
