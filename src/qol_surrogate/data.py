@@ -10,6 +10,7 @@ of relying on notebook-global state.
 import os
 import pickle
 from itertools import product
+import glob
 
 import geopandas as gpd
 import numpy as np
@@ -28,7 +29,9 @@ ZONES_FILE = "/mnt/raid1/MAAT/08.accessibility/Copenhagen/zones_Copenhagen.pkl"
 NETWORK_DIR = "/mnt/raid1/MAAT/network"
 HEX_PARQUET_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_withassignment/parquet"
 TAZ_PARQUET_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_withassignment/parquet_taz"
+TAZ_PARQUET_DIR_NO_19 = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_withassignment/parquet_taz_without_19"
 DRY_BASELINE_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_withassignment/parquet_taz_baseline"
+DRY_BASELINE_DIR_NO_19 = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_withassignment/parquet_taz_baseline_without_19"
 
 
 def load_hexes(zones_file=ZONES_FILE):
@@ -47,7 +50,7 @@ def build_taz_to_idx(taz_ids):
 
 # --- aggregation_to_taz_level.ipynb: raw hex/edge-level parquet -> TAZ-level dataset ---
 
-def aggregate_to_taz(hexes, taz_ids, hex_parquet_dir=HEX_PARQUET_DIR, network_dir=NETWORK_DIR):
+def aggregate_to_taz(hexes, taz_ids, include_file_19=True, hex_parquet_dir=HEX_PARQUET_DIR, network_dir=NETWORK_DIR):
     """Aggregate raw per-sample hex/edge-level accessibility data to TAZ level.
 
     Water depths: mean per TAZ, over the edges that lie in that TAZ.
@@ -55,7 +58,12 @@ def aggregate_to_taz(hexes, taz_ids, hex_parquet_dir=HEX_PARQUET_DIR, network_di
     Output has the same 24 columns as the source parquet, but every list is
     length-277 (TAZ-level) instead of edge/hex-level.
     """
-    ds = load_dataset("parquet", data_files=hex_parquet_dir + "/*.parquet")
+
+    parquet_files = sorted(glob.glob(hex_parquet_dir + "/*.parquet"))
+    if not include_file_19:
+        parquet_files = [f for f in parquet_files if not f.endswith("Copenhagen_19.parquet")]
+
+    ds = load_dataset("parquet", data_files=parquet_files)
     ds.set_format("pandas")
 
     edges = {
@@ -98,21 +106,30 @@ def aggregate_to_taz(hexes, taz_ids, hex_parquet_dir=HEX_PARQUET_DIR, network_di
 
 
 def save_taz_aggregated_dataset(taz_acc, taz_ids, output_dir=TAZ_PARQUET_DIR):
+
     os.makedirs(output_dir, exist_ok=True)
+
     taz_acc.to_parquet(os.path.join(output_dir, "Copenhagen_taz.parquet"))
 
     # The order of every list above is implicit (matches the source convention) -
     # save the TAZ id it corresponds to at each position, right next to the data.
+
     with open(os.path.join(output_dir, "taz_ids.pkl"), "wb") as f:
         pickle.dump(taz_ids, f)
 
     return output_dir
 
 
-def save_pseudo_dry_baseline(taz_acc, output_dir=DRY_BASELINE_DIR):
+def save_pseudo_dry_baseline(taz_acc, include_file_19=True, output_dir=None):
     """Save the scenario with the lowest total CAR water depth as a stand-in dry
     baseline, in its own folder so it never gets glob'd in with the real samples.
+
+    output_dir defaults based on include_file_19 (DRY_BASELINE_DIR vs
+    DRY_BASELINE_DIR_NO_19) - pass it explicitly to override.
     """
+    if output_dir is None:
+        output_dir = DRY_BASELINE_DIR if include_file_19 else DRY_BASELINE_DIR_NO_19
+
     os.makedirs(output_dir, exist_ok=True)
 
     min_row = float('inf')

@@ -1,9 +1,11 @@
 """Evaluation metrics (R², MAE, C-index, WAPE) - TAZ level and hex level."""
 
+import glob
 import os
 from itertools import product
 
 import numpy as np
+import pandas as pd
 import torch
 from datasets import load_dataset
 from lifelines.utils import concordance_index
@@ -27,10 +29,20 @@ def _load_taz_dry_baseline(dry_baseline_dir=DRY_BASELINE_DIR):
     return torch.stack([dry_baseline[c] for c in Y_COLS], dim=-1)
 
 
-def _load_true_hex(hex_parquet_dir=HEX_PARQUET_DIR):
+def _load_true_hex(include_file_19=True, hex_parquet_dir=HEX_PARQUET_DIR):
     """True hex-resolution accessibility for every sample, stacked in Y_COLS
-    order. Shape [n_samples_total, n_hex, 21]."""
-    ds = load_dataset("parquet", data_files=os.path.join(hex_parquet_dir, "*.parquet"))
+    order. Shape [n_samples_total, n_hex, 21].
+
+    Filtered the same way aggregate_to_taz() filters the TAZ-level dataset -
+    must match include_file_19 exactly, otherwise the resulting row order/count
+    won't line up with idx_test (excluding file 19 shifts every scenario after
+    it, since file 19 sorts into the middle of the file list, not the end).
+    """
+    parquet_files = sorted(glob.glob(os.path.join(hex_parquet_dir, "*.parquet")))
+    if not include_file_19:
+        parquet_files = [f for f in parquet_files if not f.endswith("Copenhagen_19.parquet")]
+
+    ds = load_dataset("parquet", data_files=parquet_files)
     ds = ds['train']
     ds.set_format(type='torch')
     full = ds[:]
@@ -108,7 +120,61 @@ def evaluate(model, test_loader, dry_baseline_dir=DRY_BASELINE_DIR):
     }
 
 
-def evaluate_hex_level(model, test_loader, idx_test, hexes, taz_to_idx,
+def evaluate_per_taz(model, test_loader, taz_ids, dry_baseline_dir=DRY_BASELINE_DIR):
+    """{r2, mae, c_index, wape} (absolute accessibility) *per TAZ zone*, pooled
+    across test scenarios and the 7 POI categories within each mode.
+
+    Unlike evaluate()/_summarize(), which pool everything down to one number
+    per channel, this keeps the 277 TAZ zones separate and pools the *other*
+    axes instead - answers "which zones does the model struggle with most,"
+    not "which mode/category."
+
+    Returns {metric: DataFrame(taz_id x mode)} - one DataFrame per metric,
+    each indexed by taz_id with one column per transport mode.
+    """
+    model.eval()
+
+    preds, targets = [], []
+    with torch.no_grad():
+        for batch in test_loader:
+            out = model(batch.x, batch.edge_index, batch.edge_weight)
+            preds.append(out)
+            targets.append(batch.y)
+
+    n_scenarios = len(test_loader.dataset)
+    preds = torch.cat(preds, dim=0).reshape(n_scenarios, -1, preds[0].shape[-1])
+    targets = torch.cat(targets, dim=0).reshape(n_scenarios, -1, targets[0].shape[-1])
+
+    preds_deviation = preds * model.y_std + model.y_mean
+    targets_deviation = targets * model.y_std + model.y_mean
+
+    y_dry_taz = _load_taz_dry_baseline(dry_baseline_dir)
+    preds_absolute = preds_deviation + y_dry_taz
+    targets_absolute = targets_deviation + y_dry_taz
+
+    metric_names = ["r2", "mae", "c_index", "wape"]
+    result = {metric: {"taz_id": taz_ids} for metric in metric_names}
+
+    for mode in TRANSPORT_MODES:
+        channel_idx = [i for i, col in enumerate(Y_COLS) if col.startswith(f"cumulative_accessibility_{mode}_")]
+        pred_mode = preds_absolute[:, :, channel_idx]    # [n_test, 277, 7]
+        true_mode = targets_absolute[:, :, channel_idx]
+
+        per_taz = {metric: [] for metric in metric_names}
+        for taz_idx in range(len(taz_ids)):
+            pred_taz = pred_mode[:, taz_idx, :].numpy().reshape(-1)  # pooled over scenarios + POI categories
+            true_taz = true_mode[:, taz_idx, :].numpy().reshape(-1)
+            m = _metrics_for(pred_taz, true_taz)
+            for metric in metric_names:
+                per_taz[metric].append(m[metric])
+
+        for metric in metric_names:
+            result[metric][mode] = per_taz[metric]
+
+    return {metric: pd.DataFrame(result[metric]).set_index("taz_id") for metric in metric_names}
+
+
+def evaluate_hex_level(model, test_loader, idx_test, hexes, taz_to_idx, include_file_19=True,
                         hex_parquet_dir=HEX_PARQUET_DIR, dry_baseline_dir=DRY_BASELINE_DIR):
     """Evaluate the model's TAZ-level predictions against true HEX-resolution
     ground truth, by broadcasting each predicted TAZ value to every hex that
@@ -152,7 +218,7 @@ def evaluate_hex_level(model, test_loader, idx_test, hexes, taz_to_idx,
     preds_absolute_hex = preds_absolute_taz[:, taz_idx_per_hex, :]    # [n_test, n_hex, 21]
 
     # 4. true hex-resolution accessibility, for exactly the test scenarios
-    true_hex = _load_true_hex(hex_parquet_dir)  # [n_samples_total, n_hex, 21]
+    true_hex = _load_true_hex(include_file_19=include_file_19, hex_parquet_dir=hex_parquet_dir)  # [n_samples_total, n_hex, 21]
     true_hex_test = true_hex[idx_test]           # [n_test, n_hex, 21], same scenario order as preds
 
     # 5. per-channel metrics, pooled over scenarios and hexes
@@ -165,7 +231,66 @@ def evaluate_hex_level(model, test_loader, idx_test, hexes, taz_to_idx,
     return results
 
 
-def evaluate_hex_ceiling(idx_test, hexes, taz_to_idx,
+def evaluate_hex_level_per_taz(model, test_loader, idx_test, hexes, taz_to_idx, taz_ids, include_file_19=True,
+                                hex_parquet_dir=HEX_PARQUET_DIR, dry_baseline_dir=DRY_BASELINE_DIR):
+    """{r2, mae, c_index, wape} at HEX resolution (same broadcast-and-compare
+    mechanism as evaluate_hex_level), but broken out *per TAZ zone* instead of
+    pooled city-wide - pools only across test scenarios and the 7 POI
+    categories within each mode, keeping each zone's own hexes separate from
+    every other zone's.
+
+    The hex-resolution analogue of evaluate_per_taz() - answers "which zones
+    have the worst hex-resolution accuracy" (model error + resolution loss
+    combined), mapped at TAZ granularity using hex-level ground truth.
+
+    Returns {metric: DataFrame(taz_id x mode)}.
+    """
+    # 1. predicted TAZ-level deviation -> absolute -> broadcast to hex (same as evaluate_hex_level)
+    model.eval()
+    preds = []
+    with torch.no_grad():
+        for batch in test_loader:
+            out = model(batch.x, batch.edge_index, batch.edge_weight)
+            preds.append(out)
+    n_scenarios = len(test_loader.dataset)
+    preds = torch.cat(preds, dim=0).reshape(n_scenarios, -1, preds[0].shape[-1])
+    preds_deviation = preds * model.y_std + model.y_mean
+
+    y_dry_taz = _load_taz_dry_baseline(dry_baseline_dir)
+    preds_absolute_taz = preds_deviation + y_dry_taz
+
+    taz_idx_per_hex = hexes['taz_zoneid'].map(taz_to_idx).to_numpy()  # [n_hex] - which TAZ (int position) each hex belongs to
+    preds_absolute_hex = preds_absolute_taz[:, taz_idx_per_hex, :]    # [n_test, n_hex, 21]
+
+    # 2. true hex-resolution accessibility, for exactly the test scenarios
+    true_hex = _load_true_hex(include_file_19=include_file_19, hex_parquet_dir=hex_parquet_dir)
+    true_hex_test = true_hex[idx_test]  # [n_test, n_hex, 21]
+
+    # 3. per-TAZ, per-mode metrics, pooled over scenarios + POI categories + that TAZ's own hexes
+    metric_names = ["r2", "mae", "c_index", "wape"]
+    result = {metric: {"taz_id": taz_ids} for metric in metric_names}
+
+    for mode in TRANSPORT_MODES:
+        channel_idx = [i for i, col in enumerate(Y_COLS) if col.startswith(f"cumulative_accessibility_{mode}_")]
+        pred_mode = preds_absolute_hex[:, :, channel_idx]  # [n_test, n_hex, 7]
+        true_mode = true_hex_test[:, :, channel_idx]
+
+        per_taz = {metric: [] for metric in metric_names}
+        for taz_position in range(len(taz_ids)):
+            hex_mask = taz_idx_per_hex == taz_position     # every hex belonging to this TAZ
+            pred_taz = pred_mode[:, hex_mask, :].numpy().reshape(-1)
+            true_taz = true_mode[:, hex_mask, :].numpy().reshape(-1)
+            m = _metrics_for(pred_taz, true_taz)
+            for metric in metric_names:
+                per_taz[metric].append(m[metric])
+
+        for metric in metric_names:
+            result[metric][mode] = per_taz[metric]
+
+    return {metric: pd.DataFrame(result[metric]).set_index("taz_id") for metric in metric_names}
+
+
+def evaluate_hex_ceiling(idx_test, hexes, taz_to_idx, include_file_19=True,
                           taz_parquet_dir=TAZ_PARQUET_DIR, hex_parquet_dir=HEX_PARQUET_DIR):
     """The "perfect surrogate" ceiling: broadcast the *true* TAZ-level absolute
     accessibility (not a model's prediction) to every hex within that TAZ, and
@@ -175,6 +300,12 @@ def evaluate_hex_ceiling(idx_test, hexes, taz_to_idx,
     TAZ->hex resolution loss: the ceiling every TAZ-resolution surrogate is
     measured against, regardless of how good the model is. Same concept as
     the old repo's evaluate_perfect_surrogate.py / perfect_surrogate_ceiling.ipynb.
+
+    taz_parquet_dir must already point at the folder matching include_file_19
+    (TAZ_PARQUET_DIR vs TAZ_PARQUET_DIR_NO_19) - that side is a caller
+    responsibility, since which TAZ folder to use isn't derivable from the
+    flag alone here. include_file_19 itself is used for the raw hex-parquet
+    side, which only has one folder and needs filtering at load time instead.
 
     Returns one {r2, mae, c_index, wape} dict per output channel (21 total:
     mode x POI category), pooled over every test scenario and every hex.
@@ -194,7 +325,7 @@ def evaluate_hex_ceiling(idx_test, hexes, taz_to_idx,
     ceiling_hex = true_taz_test[:, taz_idx_per_hex, :]                # [n_test, n_hex, 21]
 
     # true hex-resolution accessibility, for exactly the test scenarios
-    true_hex = _load_true_hex(hex_parquet_dir)
+    true_hex = _load_true_hex(include_file_19=include_file_19, hex_parquet_dir=hex_parquet_dir)
     true_hex_test = true_hex[idx_test]
 
     results = {}

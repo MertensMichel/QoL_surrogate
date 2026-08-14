@@ -29,12 +29,14 @@ from qol_surrogate.data import (
     save_taz_aggregated_dataset,
     split_dataset,
     DRY_BASELINE_DIR,
+    DRY_BASELINE_DIR_NO_19,
     NETWORK_DIR,
     TAZ_PARQUET_DIR,
+    TAZ_PARQUET_DIR_NO_19,
     ZONES_FILE,
 )
 
-def build_data():
+def build_data(include_file_19=True):
     """Train a surrogate model on TAZ-level data."""
     # Load hexes and build TAZ mapping
     hexes = load_hexes(ZONES_FILE)
@@ -42,14 +44,17 @@ def build_data():
     taz_ids = get_taz_ids(hexes)
     taz_to_idx = build_taz_to_idx(taz_ids)
 
-    if not os.path.exists(TAZ_PARQUET_DIR) or not os.path.exists(DRY_BASELINE_DIR):
-        taz_agg = aggregate_to_taz(hexes, taz_ids)
+    taz_parquet_dir = TAZ_PARQUET_DIR if include_file_19 else TAZ_PARQUET_DIR_NO_19
+    dry_baseline_dir = DRY_BASELINE_DIR if include_file_19 else DRY_BASELINE_DIR_NO_19
 
-        if not os.path.exists(TAZ_PARQUET_DIR):
-            save_taz_aggregated_dataset(taz_agg, taz_ids, TAZ_PARQUET_DIR)
+    if not os.path.exists(taz_parquet_dir) or not os.path.exists(dry_baseline_dir):
+        taz_agg = aggregate_to_taz(hexes, taz_ids, include_file_19=include_file_19)
 
-        if not os.path.exists(DRY_BASELINE_DIR):
-            save_pseudo_dry_baseline(taz_agg, DRY_BASELINE_DIR)
+        if not os.path.exists(taz_parquet_dir):
+            save_taz_aggregated_dataset(taz_agg, taz_ids, output_dir=taz_parquet_dir)
+
+        if not os.path.exists(dry_baseline_dir):
+            save_pseudo_dry_baseline(taz_agg, include_file_19=include_file_19)
 
     # Create Graph
     tazes = build_taz_geometries(hexes)
@@ -58,7 +63,7 @@ def build_data():
     # Load dataset tensors
     area, perimeter = create_polygon_metrics(tazes, taz_ids)
 
-    x, y = load_dataset_tensors(area, perimeter, taz_parquet_dir=TAZ_PARQUET_DIR, dry_baseline_dir=DRY_BASELINE_DIR)
+    x, y = load_dataset_tensors(area, perimeter, taz_parquet_dir=taz_parquet_dir, dry_baseline_dir=dry_baseline_dir)
     x_train, x_val, x_test, y_train, y_val, y_test, _, _, idx_test = split_dataset(x, y)
 
     x_mean, x_std, y_mean, y_std = compute_normalization_stats(x_train, y_train)
@@ -99,7 +104,7 @@ def build_model(x_mean, x_std, y_mean, y_std):
     return model
 
 
-def save_run(model, train_losses, val_losses, metrics, idx_test, models_dir):
+def save_run(model, train_losses, val_losses, metrics, idx_test, include_file_19, models_dir):
     """Save the model weights + full per-epoch loss history + test metrics into
     a dedicated folder for this run (one folder per run, timestamped so runs
     never collide) - other artifacts for this run (e.g. hex-level evaluation
@@ -118,6 +123,8 @@ def save_run(model, train_losses, val_losses, metrics, idx_test, models_dir):
         "metrics": metrics,
         "idx_test": idx_test,  # which original scenarios were held out - needed to
                                 # go back to hex-resolution ground truth for this run
+        "include_file_19": include_file_19,  # which dataset variant this run was trained on -
+                                              # scripts/evaluate.py needs this to load matching data
         "hyperparameters": {
             "in_channels": IN_CHANNELS,
             "out_channels": OUT_CHANNELS,
@@ -136,6 +143,8 @@ def save_run(model, train_losses, val_losses, metrics, idx_test, models_dir):
 IN_CHANNELS = 5
 OUT_CHANNELS = 21
 
+include_file_19 = False  # whether to include the Copenhagen_19.parquet file in the TAZ-level dataset
+
 # Actual hyperparameters - starting points matching the old repo's GCN-POI-ResNet baseline.
 HIDDEN_CHANNELS = 256
 N_LAYERS = 4
@@ -148,15 +157,16 @@ MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 
 
 def main():
-    train_loader, val_loader, test_loader, x_mean, x_std, y_mean, y_std, idx_test = build_data()
+    train_loader, val_loader, test_loader, x_mean, x_std, y_mean, y_std, idx_test = build_data(include_file_19)
     model = build_model(x_mean, x_std, y_mean, y_std)
 
     model, train_losses, val_losses = train(model, train_loader, val_loader, num_epochs=NUM_EPOCHS, patience=PATIENCE)
 
-    metrics = evaluate(model, test_loader)
+    dry_baseline_dir = DRY_BASELINE_DIR if include_file_19 else DRY_BASELINE_DIR_NO_19
+    metrics = evaluate(model, test_loader, dry_baseline_dir=dry_baseline_dir)
     print(metrics)
 
-    run_dir = save_run(model, train_losses, val_losses, metrics, idx_test, models_dir=MODELS_DIR)
+    run_dir = save_run(model, train_losses, val_losses, metrics, idx_test, include_file_19, models_dir=MODELS_DIR)
     print(f"Saved run to {run_dir}")
 
 
