@@ -11,6 +11,7 @@ from qol_surrogate.data_onfoot import (
     create_graph_features,
     load_hexes,
     get_taz_ids,
+    save_dry_baseline,
     save_taz_aggregated_dataset,
     TAZ_PARQUET_DIR,
     ZONES_FILE,
@@ -66,6 +67,15 @@ def create_static_features_and_save():
         pickle.dump({"edge_index": edge_index, "edge_weight": edge_weights, "taz_ids": taz_ids}, f)
 
 
+def aggregate_dry_baseline_and_save():
+    """Aggregate the true dry (zero-flood) baseline scenario to TAZ level and save it."""
+    hexes = load_hexes(ZONES_FILE)
+    taz_ids = get_taz_ids(hexes)
+
+    save_dry_baseline(hexes, taz_ids)
+
+
 if __name__ == "__main__":
     aggregate_dynamic_to_taz_and_save()
     create_static_features_and_save()
+    aggregate_dry_baseline_and_save()
