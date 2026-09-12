@@ -38,9 +38,10 @@ class GCNResNet(nn.Module):
         self.register_buffer('graph_edge_index', edge_index)
         self.register_buffer('graph_edge_weight', edge_weight)
         self.register_buffer('dry_baseline', dry_baseline)
-        # Per-ON_FOOT-edge -> TAZ mapping (positional, dustbin index = len(taz_ids) for
-        # edges belonging to a TAZ with no hexes) - see data_onfoot.load_edge_taz_ids().
-        # Needed to aggregate a raw edge-resolution inference sample into TAZ-level stats.
+        # Per-edge (of this mode's road network) -> TAZ mapping (positional, dustbin
+        # index = len(taz_ids) for edges belonging to a TAZ with no hexes) - see
+        # data_onfoot/data_car/data_bicycle's load_edge_taz_ids(). Needed to aggregate
+        # a raw edge-resolution inference sample into TAZ-level stats.
         self.register_buffer('edge_taz_ids', edge_taz_ids)
 
 

@@ -1,10 +1,12 @@
-"""Entry point: loads the pre-cached TAZ-level onfoot dataset, builds the model, trains,
+"""Entry point: loads the pre-cached TAZ-level BICYCLE dataset, builds the model, trains,
 and saves a fully self-contained checkpoint (weights + norm stats + static features +
 graph + dry baseline, all as buffers - see qol_surrogate.model_architecture.GCNResNet).
 
 Unlike scripts/train.py, this does NOT lazily aggregate raw data on first run - it
-assumes scripts/agg_and_static_features.py has already been run to produce the cached
-dynamic parquet, static_features.pkl, graph.pkl, and dry-baseline parquet.
+assumes scripts/agg_bicycle.py has already been run to produce the cached dynamic
+parquet and dry-baseline parquet. static_features.pkl/graph.pkl are NOT mode-specific
+(the street-network/POI/geometry static features are identical regardless of transport
+mode) and are reused as-is from scripts/agg_and_static_features.py's onfoot output.
 """
 
 import os
@@ -16,7 +18,7 @@ import torch
 from qol_surrogate.model_architecture import GCNResNet
 from qol_surrogate.train import train
 
-from qol_surrogate.data_onfoot import (
+from qol_surrogate.data_bicycle import (
     build_data_list,
     build_loaders,
     build_taz_to_idx,
@@ -35,9 +37,8 @@ from qol_surrogate.data_onfoot import (
 
 def build_data():
     """Load the pre-cached static features + graph + dynamic/dry-baseline parquet and
-    build train/val/test loaders, exactly like train.py's build_data() but sourced
-    entirely from scripts/agg_and_static_features.py's cached output rather than
-    re-deriving anything from raw geometry/POI/network data.
+    build train/val/test loaders, exactly like train_onfoot.py's build_data() but
+    sourced from scripts/agg_bicycle.py's cached output.
     """
     with open(os.path.join(STATIC_FEATURES_DIR, "static_features.pkl"), "rb") as f:
         static_features_dict = pickle.load(f)
@@ -100,9 +101,9 @@ def build_model(x_mean, x_std, y_mean, y_std, static_features, edge_index, edge_
 
 def save_run(model, train_losses, val_losses, idx_test, taz_ids, models_dir):
     """Save the model weights + full per-epoch loss history into a dedicated,
-    timestamped run folder - same convention as scripts/train.py's save_run()."""
+    timestamped run folder - same convention as scripts/train_onfoot.py's save_run()."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(models_dir, f"gcn_resnet_onfoot_{timestamp}")
+    run_dir = os.path.join(models_dir, f"gcn_resnet_bicycle_{timestamp}")
     os.makedirs(run_dir, exist_ok=True)
 
     checkpoint_path = os.path.join(run_dir, "model.pt")
@@ -135,12 +136,12 @@ def save_run(model, train_losses, val_losses, idx_test, taz_ids, models_dir):
 
 
 # x/y feature counts are fixed by the data (5 dynamic water-depth stats + 24 static
-# features in, 7 ON_FOOT POI-category accessibility-deviation outputs) - not tunable.
+# features in, 7 BICYCLE POI-category accessibility-deviation outputs) - not tunable.
 IN_CHANNELS = 29
 OUT_CHANNELS = 7
 
-# Same starting-point hyperparameters as scripts/train.py - not yet tuned for this
-# 29-channel/22k-scenario dataset specifically.
+# Same starting-point hyperparameters as scripts/train_onfoot.py - not yet tuned for
+# this dataset specifically (4.5k BICYCLE scenarios vs. onfoot's ~22k).
 HIDDEN_CHANNELS = 256
 N_LAYERS = 4
 DROPOUT_RATE = 0.1
@@ -159,10 +160,10 @@ def main():
 
     model, train_losses, val_losses = train(model, train_loader, val_loader, num_epochs=NUM_EPOCHS, patience=PATIENCE)
 
-    # NOTE: qol_surrogate.evaluate.evaluate() is NOT used here - it's hardcoded to the
-    # old 3-mode/21-channel Y_COLS and would KeyError against this 7-channel ON_FOOT
-    # dataset. Test-set R2/MAE/WAPE reporting needs an onfoot-specific evaluate function
-    # (not yet written) before this can report metrics beyond train/val loss curves.
+    # NOTE: no BICYCLE-specific evaluate function exists yet (mirrors evaluate_onfoot.py's
+    # relationship to ON_FOOT - qol_surrogate.evaluate.evaluate() is hardcoded to the old
+    # 3-mode/21-channel Y_COLS and would KeyError here). Test-set R2/MAE/WAPE reporting
+    # needs an evaluate_bicycle.py before this can report metrics beyond train/val loss curves.
     run_dir = save_run(model, train_losses, val_losses, idx_test, taz_ids, models_dir=MODELS_DIR)
     print(f"Saved run to {run_dir}")
 

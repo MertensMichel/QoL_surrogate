@@ -1,26 +1,39 @@
-"""Inference entry point for the ON_FOOT QoL surrogate - load a trained checkpoint
-once, then call .predict() as many times as needed (e.g. once per RL step) without
-reloading anything.
+"""Inference entry point for the QoL surrogate - load a trained checkpoint once
+(by mode - "onfoot", "car", or "bicycle"), then call .predict() as many times as
+needed (e.g. once per RL step) without reloading anything.
 
 Usage:
-    surrogate = QoL_surrogate("path/to/model.pt")          # load once, at setup time
+    surrogate = QoL_surrogate(mode="car")                   # load once, at setup time
     result = surrogate.predict(raw_water_depths)            # call repeatedly
 
-    # raw_water_depths: 1D array-like, one ON_FOOT water-depth value per edge, same
-    #   order as ON_FOOT_edges_Copenhagen.pkl (length == n_onfoot_edges, e.g. 175342)
+    # raw_water_depths: 1D array-like, one water-depth value per edge of that mode's
+    #   road network, same order as {MODE}_edges_Copenhagen.pkl (length ==
+    #   surrogate.model.edge_taz_ids.shape[0], e.g. 175342 for onfoot)
     # result: DataFrame indexed by real taz_zoneid, columns = POI category names -
-    #   absolute (not deviation) ON_FOOT accessibility, ready to use directly.
+    #   absolute (not deviation) accessibility for that mode, ready to use directly.
 """
+
+import os
 
 import pandas as pd
 import torch
 
-from qol_surrogate.model_onfoot import GCNResNet
+from qol_surrogate.model_architecture import GCNResNet
 
 # Duplicated from qol_surrogate.data_onfoot.POI_CATEGORIES rather than imported
 # Order must match the model's output channel order
 POI_CATEGORIES = ['cultural', 'education', 'green_space', 'health',
                    'public_spaces', 'public_transportation', 'sports']
+
+# Where staged production checkpoints live, one per mode - see
+# QoL_surrogate.__init__'s `mode` argument.
+STATIC_FEATURES_DIR = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate"
+
+
+def resolve_model_path(mode, static_features_dir=STATIC_FEATURES_DIR):
+    """mode ("onfoot", "car", or "bicycle", case-insensitive) -> the conventioned
+    checkpoint path for that mode: qol_surrogate_weights_{mode}.pt."""
+    return os.path.join(static_features_dir, f"qol_surrogate_weights_{mode.lower()}.pt")
 
 
 def load_model(model_path):
@@ -41,7 +54,7 @@ def load_model(model_path):
         edge_index=torch.zeros(2, hp["n_edges"], dtype=torch.long),
         edge_weight=torch.zeros(hp["n_edges"]),
         dry_baseline=torch.zeros(hp["num_taz"], hp["out_channels"]),
-        edge_taz_ids=torch.zeros(hp["n_onfoot_edges"], dtype=torch.long),
+        edge_taz_ids=torch.zeros(hp["n_edge_taz_ids"], dtype=torch.long),
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
@@ -50,14 +63,31 @@ def load_model(model_path):
 
 
 class QoL_surrogate:
-    def __init__(self, model_path):
+    def __init__(self, mode=None, model_path=None):
+        """Load a trained checkpoint - pass exactly one of `mode` or `model_path`.
 
+        mode: "onfoot", "car", or "bicycle" (case-insensitive) - resolves to the
+        staged production checkpoint for that mode (qol_surrogate_weights_{mode}.pt
+        under STATIC_FEATURES_DIR). This is the normal way to construct this class.
+
+        model_path: an explicit checkpoint path, for loading a specific file directly
+        (e.g. a run-directory checkpoint during development) instead of the staged
+        production one.
+        """
+        if (mode is None) == (model_path is None):
+            raise ValueError("QoL_surrogate: pass exactly one of `mode` or `model_path`")
+
+        if mode is not None:
+            model_path = resolve_model_path(mode)
+
+        self.mode = mode
         self.model, self.taz_ids = load_model(model_path)
 
     def predict(self, input_sample):
-        """Predict absolute ON_FOOT accessibility per TAZ per POI category from a raw,
-        edge-resolution water-depth sample (same format/order as one row of the
-        training data - length == number of ON_FOOT edges).
+        """Predict absolute accessibility (for this instance's mode) per TAZ per POI
+        category from a raw, edge-resolution water-depth sample (same format/order
+        as one row of the training data - length == number of edges in this mode's
+        road network).
 
         Returns: a DataFrame indexed by real taz_zoneid (self.taz_ids), columns
         named by POI category - self-labeling, so no separate lookup is needed to
@@ -66,17 +96,18 @@ class QoL_surrogate:
         num_taz = self.model.static_features.shape[0]
 
         # input_sample: 1D array-like (list / numpy array / torch tensor) of length
-        # self.model.edge_taz_ids.shape[0] (n_onfoot_edges, e.g. 175342 for Copenhagen)
-        # - one ON_FOOT water-depth value per edge, in the SAME ORDER as
-        # ON_FOOT_edges_Copenhagen.pkl (i.e. positionally aligned with edge_taz_ids,
-        # since that's what it gets grouped against right below).
+        # self.model.edge_taz_ids.shape[0] (e.g. 175342 for onfoot in Copenhagen) -
+        # one water-depth value per edge of this mode's road network, in the SAME
+        # ORDER as that mode's {MODE}_edges_Copenhagen.pkl (i.e. positionally aligned
+        # with edge_taz_ids, since that's what it gets grouped against right below).
 
 
         # CAUTION: this order (mean, p25, p50, p75, p90) must exactly match
-        # data_onfoot.load_dataset_tensors()'s dynamic_cols order used at training
-        # time - it's currently duplicated by hand in both places, not derived from
-        # one shared source, so a change on one side won't error on the other, it'll
-        # just silently mislabel which column means what.
+        # data_{mode}.load_dataset_tensors()'s dynamic_cols order used at training
+        # time (data_onfoot/data_car/data_bicycle each define their own, identically
+        # ordered) - it's currently duplicated by hand in all these places, not
+        # derived from one shared source, so a change on one side won't error on the
+        # other, it'll just silently mislabel which column means what.
         grouped = pd.Series(input_sample).groupby(self.model.edge_taz_ids.numpy())
         dynamic_stats = [grouped.mean()] + [grouped.quantile(q) for q in [0.25, 0.5, 0.75, 0.9]]
         dynamic = torch.stack([
