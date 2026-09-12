@@ -1,3 +1,8 @@
+"""[ONFOOT + SHARED] Aggregates raw ON_FOOT data to TAZ level AND builds the
+static features/graph (static_features.pkl, graph.pkl) that CAR and BICYCLE
+reuse unchanged - run this once before agg_car.py/agg_bicycle.py, which only
+do their own mode's dynamic aggregation."""
+
 import os
 import pickle
 

@@ -1,4 +1,4 @@
-"""Entry point: computes TAZ/hex/ceiling evaluation metrics for a trained run
+"""[LEGACY: 3-mode/21-channel pipeline] Entry point: computes TAZ/hex/ceiling evaluation metrics for a trained run
 and saves them into that run's own folder (eval_results.pkl), so
 notebooks/evaluate_hex.ipynb can just load the result instead of recomputing
 it. Meant to be run standalone (e.g. inside tmux), not from a notebook cell -

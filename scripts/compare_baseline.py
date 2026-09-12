@@ -1,4 +1,4 @@
-"""Entry point: compares the GCN and the Boosted Forest baseline on identical
+"""[LEGACY: 3-mode/21-channel pipeline] Entry point: compares the GCN and the Boosted Forest baseline on identical
 held-out scenarios, TAZ-resolution only (model prediction vs. true TAZ value -
 no hex-resolution data needed, so this is fast for both models).
 

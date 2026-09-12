@@ -1,4 +1,4 @@
-"""Entry point: loads the pre-cached TAZ-level CAR dataset, builds the model, trains,
+"""[CAR] Entry point: loads the pre-cached TAZ-level CAR dataset, builds the model, trains,
 and saves a fully self-contained checkpoint (weights + norm stats + static features +
 graph + dry baseline, all as buffers - see qol_surrogate.model_architecture.GCNResNet).
 

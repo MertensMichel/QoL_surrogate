@@ -1,4 +1,4 @@
-"""Hyperparameter tuning for GCNResNet via Optuna (TPE sampler + median pruning).
+"""[LEGACY: 3-mode/21-channel pipeline] Hyperparameter tuning for GCNResNet via Optuna (TPE sampler + median pruning).
 
 Standalone script - does not import from or modify scripts/train.py or
 scripts/evaluate.py. The TAZ graph/tensors are built once (independent of any

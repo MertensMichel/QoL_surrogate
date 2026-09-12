@@ -1,4 +1,4 @@
-"""The GCNResNet model class.
+"""[SHARED: onfoot/car/bicycle all use this class] The GCNResNet model class.
 
 Ported from: notebooks/gcn.ipynb
 """

@@ -1,4 +1,4 @@
-"""Entry point: trains the ON_FOOT Multiple Linear Regression baseline (see
+"""[ONFOOT] Entry point: trains the ON_FOOT Multiple Linear Regression baseline (see
 qol_surrogate.baseline_linear_onfoot for the architecture) and saves it into
 its own models/baseline_linear_onfoot/ folder, kept separate from the GCN's
 models/gcn_resnet_onfoot_* runs and from models/baseline_onfoot/ (Boosted

@@ -1,4 +1,4 @@
-"""Entry point: computes TAZ/hex/ceiling evaluation metrics for a trained
+"""[LEGACY: 3-mode/21-channel pipeline] Entry point: computes TAZ/hex/ceiling evaluation metrics for a trained
 Boosted Forest baseline run and saves them into that run's own folder
 (eval_results.pkl) - same shape as scripts/evaluate.py produces for the GCN
 ({taz, hex, hex_per_taz, ceiling}), so both can be loaded and compared

@@ -1,4 +1,4 @@
-"""Entry point: trains the ON_FOOT Boosted Forest baseline (see
+"""[ONFOOT] Entry point: trains the ON_FOOT Boosted Forest baseline (see
 qol_surrogate.baseline_onfoot for the architecture) and saves it into its own
 models/baseline_onfoot/ folder, kept separate from the GCN's
 models/gcn_resnet_onfoot_* runs and from the old models/baseline/ (21-channel)

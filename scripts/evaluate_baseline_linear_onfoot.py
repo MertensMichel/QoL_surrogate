@@ -1,4 +1,4 @@
-"""Entry point: computes TAZ-level evaluation metrics for a trained ON_FOOT
+"""[ONFOOT] Entry point: computes TAZ-level evaluation metrics for a trained ON_FOOT
 Linear Regression baseline run and saves them into that run's own folder
 (eval_results.pkl) - same shape as scripts/evaluate_onfoot.py /
 scripts/evaluate_baseline_onfoot.py produce ({taz, taz_per_taz}), so all

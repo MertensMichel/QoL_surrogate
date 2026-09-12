@@ -1,4 +1,4 @@
-"""TAZ-level evaluation metrics (R2, MAE, C-index, WAPE) for the BICYCLE-only
+"""[BICYCLE] TAZ-level evaluation metrics (R2, MAE, C-index, WAPE) for the BICYCLE-only
 surrogate (model_architecture.GCNResNet). Kept separate from qol_surrogate.evaluate,
 which is hardcoded to the old 3-mode/21-channel Y_COLS and would mis-index
 against this model's 7-channel (POI-category-only) output.

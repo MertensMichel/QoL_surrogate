@@ -1,4 +1,4 @@
-"""Entry point: loads data, builds the model, trains, and evaluates.
+"""[LEGACY: 3-mode/21-channel pipeline] Entry point: loads data, builds the model, trains, and evaluates.
 
 Thin script - imports from qol_surrogate.*, defines main(), guarded by __main__.
 """

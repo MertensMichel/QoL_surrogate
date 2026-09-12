@@ -1,4 +1,4 @@
-"""The GCNResNet model class.
+"""[LEGACY: 3-mode/21-channel pipeline] The GCNResNet model class.
 
 Ported from: notebooks/gcn.ipynb
 """

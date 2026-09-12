@@ -1,4 +1,4 @@
-"""Boosted Forest baseline for the ON_FOOT-only surrogate: same TAZ-level
+"""[ONFOOT] Boosted Forest baseline for the ON_FOOT-only surrogate: same TAZ-level
 pipeline (29 per-TAZ input features - see data_onfoot.STATIC_FEATURE_COLS +
 the 5 dynamic water-depth stats), same target definition (accessibility
 deviation from the dry baseline), same train/val/test split as

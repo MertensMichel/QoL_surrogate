@@ -1,4 +1,4 @@
-"""Multiple Linear Regression baseline for the ON_FOOT-only surrogate: same
+"""[ONFOOT] Multiple Linear Regression baseline for the ON_FOOT-only surrogate: same
 TAZ-level pipeline (29 per-TAZ input features flattened across all 277 TAZ,
 8033-dim input), same 7 POI-category output channels, same train/val/test
 split as model_architecture.GCNResNet and baseline_onfoot's Boosted Forest - but

@@ -1,4 +1,4 @@
-"""Aggregate raw BICYCLE hex/edge-level accessibility data to TAZ level and save
+"""[BICYCLE] Aggregate raw BICYCLE hex/edge-level accessibility data to TAZ level and save
 both the dynamic dataset and a pseudo dry baseline.
 
 Unlike scripts/agg_and_static_features.py, this does NOT (re)compute static

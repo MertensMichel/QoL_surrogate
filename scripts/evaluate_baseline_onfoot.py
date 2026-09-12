@@ -1,4 +1,4 @@
-"""Entry point: computes TAZ-level evaluation metrics for a trained ON_FOOT
+"""[ONFOOT] Entry point: computes TAZ-level evaluation metrics for a trained ON_FOOT
 Boosted Forest baseline run and saves them into that run's own folder
 (eval_results.pkl) - same shape as scripts/evaluate_onfoot.py produces for the
 GCN ({taz, taz_per_taz}), so both can be loaded and compared side-by-side in

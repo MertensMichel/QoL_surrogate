@@ -1,4 +1,4 @@
-"""Training loop.
+"""[SHARED: used by every pipeline, legacy and per-mode alike] Training loop.
 """
 
 

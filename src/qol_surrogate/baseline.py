@@ -1,4 +1,4 @@
-"""Boosted Forest baseline: same TAZ-level pipeline, same target definition
+"""[LEGACY: 3-mode/21-channel pipeline] Boosted Forest baseline: same TAZ-level pipeline, same target definition
 (accessibility deviation from the dry baseline), same train/val/test split as
 the GCN - but the graph is removed entirely, not approximated.
 

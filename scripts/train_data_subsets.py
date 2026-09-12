@@ -1,3 +1,8 @@
+"""[LEGACY: 3-mode/21-channel pipeline] Learning-curve experiment: trains on
+increasing fractions of the (small, ~637-scenario) legacy training set to see
+how accuracy scales with data size. Not applicable to the newer per-mode
+(onfoot/car/bicycle) pipeline or its much larger datasets."""
+
 import os
 from datetime import datetime
 

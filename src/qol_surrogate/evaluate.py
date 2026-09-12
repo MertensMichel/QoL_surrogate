@@ -1,4 +1,4 @@
-"""Evaluation metrics (R², MAE, C-index, WAPE) - TAZ level and hex level."""
+"""[LEGACY: 3-mode/21-channel pipeline] Evaluation metrics (R², MAE, C-index, WAPE) - TAZ level and hex level."""
 
 import glob
 import os

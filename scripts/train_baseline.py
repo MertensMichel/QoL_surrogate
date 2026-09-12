@@ -1,4 +1,4 @@
-"""Entry point: trains the Boosted Forest baseline (see
+"""[LEGACY: 3-mode/21-channel pipeline] Entry point: trains the Boosted Forest baseline (see
 qol_surrogate.baseline for the architecture) and saves it into its own
 models/baseline/ folder, kept separate from the GCN's models/gcn_resnet_*
 runs.

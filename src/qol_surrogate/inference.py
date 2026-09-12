@@ -1,4 +1,4 @@
-"""Inference entry point for the QoL surrogate - load a trained checkpoint once
+"""[SHARED: all 3 modes, via mode=] Inference entry point for the QoL surrogate - load a trained checkpoint once
 (by mode - "onfoot", "car", or "bicycle"), then call .predict() as many times as
 needed (e.g. once per RL step) without reloading anything.
 

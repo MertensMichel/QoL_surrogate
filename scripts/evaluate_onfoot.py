@@ -1,4 +1,4 @@
-"""Entry point: computes TAZ-level evaluation metrics for a trained ON_FOOT
+"""[ONFOOT] Entry point: computes TAZ-level evaluation metrics for a trained ON_FOOT
 surrogate run (model_architecture.GCNResNet, from scripts/train_onfoot.py) and saves
 them into that run's own folder (eval_results.pkl), so notebooks can just load
 the result instead of recomputing it - same convention as scripts/evaluate.py
