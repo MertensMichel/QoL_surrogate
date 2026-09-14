@@ -33,7 +33,7 @@ TAZ_PARQUET_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_foot/parq
 TAZ_PARQUET_DIR_NO_19 = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_foot/parquet_taz_without_19"
 DRY_BASELINE_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_foot/parquet_taz_baseline"
 DRY_BASELINE_DIR_NO_19 = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_foot/parquet_taz_baseline_without_19"
-BASELINE_FILE = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate/Copenhagen_acc_raindist_samples_BASELINE.pkl"
+BASELINE_FILE = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate/Copenhagen_acc_raindist_samples_BASELINE_ONFOOT.pkl"
 STATIC_FEATURES_DIR = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate"
 
 # Canonical order for the static-feature block of x - the SAME list must be used

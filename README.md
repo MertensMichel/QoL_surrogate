@@ -38,7 +38,9 @@ setup time, then call `.predict()` repeatedly (e.g. once per RL step) - see
 
 1. **Aggregate** raw hex/edge-resolution scenario data to TAZ level: `scripts/agg_{mode}.py`.
    ON_FOOT's `scripts/agg_and_static_features.py` additionally builds the static
-   features/graph that CAR and BICYCLE reuse unchanged (they're mode-independent).
+   features/graph that CAR and BICYCLE reuse unchanged (they're mode-independent). Each
+   mode also saves its own real dry (zero-flood) baseline, which the model's "absolute
+   accessibility" predictions are anchored to.
 2. **Train**: `scripts/train_{mode}.py` -> `models/gcn_resnet_{mode}_<timestamp>/model.pt`
    (gitignored - checkpoints aren't committed).
 3. **Evaluate**: `scripts/evaluate_{mode}.py` -> `eval_results.pkl` saved into that run's folder.
@@ -95,9 +97,6 @@ QoL_surrogate/
 
 ## Known limitations
 
-- **CAR/BICYCLE use a pseudo dry baseline.** Unlike ON_FOOT (a real zero-flood scenario),
-  CAR/BICYCLE's "absolute accessibility" numbers are anchored to the lowest-total-water-depth
-  scenario available as a stand-in (`save_pseudo_dry_baseline`) - not a genuine dry run.
 - **CAR/BICYCLE train on far less data.** ~4,500 scenarios each vs. ON_FOOT's ~22,000, using
   the same untouched hyperparameters (`HIDDEN_CHANNELS=256`, `PATIENCE=12`, etc.) - not
   re-tuned for the smaller dataset. Evaluated accuracy is comparable to ON_FOOT regardless,

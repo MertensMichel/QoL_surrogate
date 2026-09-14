@@ -31,7 +31,7 @@ POI_FILE = "/mnt/raid1/MAAT/07.osm_pois/Copenhagen/pois_clean_Copenhagen.pkl"
 HEX_PARQUET_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_car/parquet"
 TAZ_PARQUET_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_car/parquet_taz"
 DRY_BASELINE_DIR = "/mnt/raid1/MAAT/20.surrogate_data/cph/accessibility_car/parquet_taz_baseline"
-BASELINE_FILE = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate/Copenhagen_acc_raindist_samples_BASELINE.pkl"
+BASELINE_FILE = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate/Copenhagen_acc_raindist_samples_BASELINE_CAR.pkl"
 STATIC_FEATURES_DIR = "/mnt/raid1/MAAT/20.surrogate_data/qol_surrogate"
 
 # Canonical order for the static-feature block of x - the SAME list must be used
@@ -157,14 +157,11 @@ def save_pseudo_dry_baseline(taz_acc, output_dir=DRY_BASELINE_DIR):
     """Save the scenario with the lowest total CAR water depth as a stand-in dry
     baseline, in its own folder so it never gets glob'd in with the real samples.
 
-    CURRENTLY USED - there's no real dry (zero-flood) CAR scenario available yet
-    (unlike ON_FOOT's Copenhagen_acc_raindist_samples_BASELINE.pkl), so this
-    approximation stands in until one exists. Operates directly on taz_acc
+    NOT CURRENTLY USED - superseded by save_dry_baseline() below now that a real
+    dry-run CAR scenario exists (Copenhagen_acc_raindist_samples_BASELINE_CAR.pkl).
+    Kept here for reference/rollback. Operates directly on taz_acc
     (aggregate_to_taz()'s output), not raw hex data - call it right after
     aggregating the main dataset, using the same taz_acc.
-
-    See save_dry_baseline() below for the real-baseline method - swap to that once
-    a genuine dry-run CAR scenario is available; it's kept here unused for now.
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -185,9 +182,8 @@ def save_dry_baseline(hexes, taz_ids, baseline_file=BASELINE_FILE, output_dir=DR
                        network_dir=NETWORK_DIR):
     """Aggregate the true dry (zero-flood, event_intensity=0) baseline scenario to TAZ
     level and save it - replaces the min-water-depth "pseudo" stand-in
-    (save_pseudo_dry_baseline() above) once a real dry-run sample exists for CAR.
-    NOT CURRENTLY USED - baseline_file (BASELINE_FILE) only has ON_FOOT columns
-    today, so this will KeyError if called as-is; kept here ready to switch to.
+    (save_pseudo_dry_baseline() above). CURRENTLY USED - baseline_file
+    (BASELINE_FILE) now points at a real dry-run CAR scenario.
 
     Reuses aggregate_to_taz()'s exact per-scenario aggregation logic rather than
     duplicating it: the baseline pickle is the same raw single-scenario schema as one
